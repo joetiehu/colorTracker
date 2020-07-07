@@ -64,7 +64,7 @@ Mat cannyEdgeImage(Mat& I, int lowThreshold, int ratio, int kernel_size)
 }
 
 /*Find Lines*/
-void findLines(Mat& I, Mat& colorImage)
+vector<Vec2f> findLines(Mat& I, Mat& colorImage)
 {
     vector<Vec2f> lines; // will hold the results of the detection
     HoughLines(I, lines, 1, CV_PI/180, 200, 0, 0 ); // runs the actual detection
@@ -80,8 +80,78 @@ void findLines(Mat& I, Mat& colorImage)
         pt2.x = cvRound(x0 - 1000*(-b));
         pt2.y = cvRound(y0 - 1000*(a));
 	cout<< lines[i][0]<<":"<<lines[i][1]<<endl;
+        //line(colorImage , pt1, pt2, Scalar(0,0,255), 3, LINE_AA);
+    }
+
+    float rho_0, theta_0, rho, theta;
+  float rho_gap = 16.0, rho_error = 0.1, theta_error = 0.1, theta_ortho = M_PI/2;
+  bool findLine[4] = {0,0,0,0};
+  vector<Vec2f> klines;
+  
+  for (size_t i = 0; i < lines.size(); i++)
+  {
+      rho_0 = lines[i][0];
+      theta_0 = lines[i][1];
+      cout << "i =" << i << endl;
+      for(size_t j = (i+1); j < lines.size(); j++)
+	{
+	  rho = lines[j][0];
+	  theta = lines[j][1];
+	  cout << "j =" << j << endl;
+	  cout <<"abs(theta-theta_0)" << abs(theta-theta_0) <<endl;
+	  cout << "theta_error" << theta_error << endl;
+	  if (abs(theta-theta_0) <= theta_error)
+	    {
+	      if(abs(abs(rho_0-rho)-rho_gap) <= rho_error)
+		{
+		  findLine[0] =1;
+		  klines[0][0] = rho_0;
+		  klines[0][1] = theta_0;
+		  klines[1][0] = lines[j][0];
+		  klines[1][1] = lines[j][1];
+		}
+	     }
+
+	  cout << "thta-theta_0" << abs(abs(theta-theta_0)-theta_ortho) << endl;
+	  if (abs(abs(theta-theta_0)-theta_ortho) <= theta_error)
+	    {
+	      if(findLine[1] == 0)
+		{
+		  cout << "findLine[1]:"<< findLine[1] << endl;
+		  findLine[1] = 1;
+		  cout << "findLine[1]"<< findLine[1]<< endl; 
+		  //klines[2][0] = lines[j][0];
+		  //klines[2][1] = lines[j][1];
+		  cout <<"klines[2][0]" <<  endl;
+		}
+	      else if(findLine[1] == 1)
+		{
+		  findLine[2] = 1;
+		  klines[3][0] = lines[j][0];
+		  klines[3][1] = lines[j][1];
+		}
+	      cout << "j =" << "Finish first loop" << endl;
+	    }
+      
+        }
+  }
+  
+  for( size_t i = 0; i < klines.size(); i++ )
+    {
+        float rho = klines[i][0], theta = klines[i][1];
+        Point pt1, pt2;
+        double a = cos(theta), b = sin(theta);
+        double x0 = a*rho, y0 = b*rho;
+        pt1.x = cvRound(x0 + 1000*(-b));
+        pt1.y = cvRound(y0 + 1000*(a));
+        pt2.x = cvRound(x0 - 1000*(-b));
+        pt2.y = cvRound(y0 - 1000*(a));
+	cout<< klines[i][0]<<":"<<klines[i][1]<<endl;
         line(colorImage , pt1, pt2, Scalar(0,0,255), 3, LINE_AA);
     }
+
+  return klines;
+          
 }
 
 void roiImage(Mat& I, Point start, Point end)
@@ -91,19 +161,64 @@ void roiImage(Mat& I, Point start, Point end)
 
 vector<Vec2f> knearestLines(Mat& I, vector<Vec2f> lines)
 {
-  float rho_0 = lines[0][0], theta_0 = line[0][1];
-  float rho_gap = 16.0, theta_error = 0.001, theta_ortho = M_PI/2;
+  float rho_0, theta_0, rho, theta;
+  float rho_gap = 16.0, rho_error = 0.1, theta_error = 0.1, theta_ortho = M_PI/2;
+  bool findLine[4] = {0,0,0,0};
   vector<Vec2f> klines;
   
   for (size_t i =0; i < lines.size(); i++)
-    {
-      float rho = lines[i][0], theta = lines[i][1];
-      if ((theta-theta_0) <= theta_error)
+  {
+      rho_0 = lines[i][0];
+      theta_0 = lines[i][1];
+      for(size_t j = (i+1); j < lines.size(); j++)
 	{
-	  
-	}
+	  rho = lines[j][0];
+	  theta = lines[j][1];
+	  if (abs(theta-theta_0) <= theta_error)
+	    {
+	      if(abs(abs(rho_0-rho)-rho_gap) <= rho_error)
+		{
+		  findLine[0] =1;
+		  klines[0][0] = rho_0;
+		  klines[0][1] = theta_0;
+		  klines[1][0] = lines[j][0];
+		  klines[1][1] = lines[j][1];
+		}
+	     }
+	  if (abs(abs(theta-theta_0)-theta_ortho) <= theta_error)
+	    {
+	      if(findLine[1] == 0)
+		{
+		  findLine[1] =1;
+		  klines[2][0] = lines[j][0];
+		  klines[2][1] = lines[j][1];
+		}
+	      else if(findLine[1] == 1)
+		{
+		  findLine[2] = 1;
+		  klines[3][0] = lines[j][0];
+		  klines[3][1] = lines[j][1];
+		}
+	    }
       
+        }
+  }
+  
+  for( size_t i = 0; i < klines.size(); i++ )
+    {
+        float rho = klines[i][0], theta = klines[i][1];
+        Point pt1, pt2;
+        double a = cos(theta), b = sin(theta);
+        double x0 = a*rho, y0 = b*rho;
+        pt1.x = cvRound(x0 + 1000*(-b));
+        pt1.y = cvRound(y0 + 1000*(a));
+        pt2.x = cvRound(x0 - 1000*(-b));
+        pt2.y = cvRound(y0 - 1000*(a));
+	cout<< klines[i][0]<<":"<<klines[i][1]<<endl;
+        line(I , pt1, pt2, Scalar(0,0,255), 3, LINE_AA);
     }
+
+  return klines;
 }
 
 void findLineIntersection(Mat& I, vector<Vec2f> Lines)
@@ -154,7 +269,7 @@ int main(int argc, char** argv)
         printf("usage: DisplayImage.out <Image_Path>\n");
         return -1;
     }
-    Mat image, colorImage, grayImage, blurImage, edgeImage;
+    Mat image, colorImage, colorImage_02,  grayImage, blurImage, edgeImage;
     string displaywindowname = "Display Window";
     string roiwindowname = "ROI window";
     string blurwindowname = "Gaussian filter window";
@@ -173,6 +288,9 @@ int main(int argc, char** argv)
     int ratio = 3;
     int kernel_size = 3;
     Point boxStart, boxEnd ;
+
+    vector<Vec2f> klines;
+    vector<Vec2f> flines;
     
     boxStart = Point(300, 400);
     boxEnd = Point(500, 600);
@@ -188,6 +306,7 @@ int main(int argc, char** argv)
     }
     /*color Image*/
     colorImage = image.clone();
+    colorImage_02 = image.clone();
     /*Convert to gray image*/
     grayImage = convertGrayImage(colorImage);
     /*apply gaussian blur filter*/
@@ -205,7 +324,8 @@ int main(int argc, char** argv)
     cin >> kernel_size;
     
     edgeImage = cannyEdgeImage(edgeImage, lowThreshold, ratio, kernel_size);
-    findLines(edgeImage, colorImage);
+    flines = findLines(edgeImage, colorImage);
+    //klines = knearestLines(colorImage_02, flines);
     //drawLine(image, x, y);
     //Draw a Region Box
     //drawBox(image, x, y);
